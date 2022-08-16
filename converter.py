@@ -3,6 +3,7 @@ import sys
 import os
 import glob
 import json
+import re
 
 # defines =====================
 
@@ -45,10 +46,40 @@ def get_users(source_dir):
 
     return users
 
+def replace_user_in_text(users, text):
+    regexp = r'\<@(.+?)\>'
+    user_id = re.findall(regexp,text)
+
+    new_text = text
+    
+
+    if len(user_id) != 0:
+        for user_ids in user_id: 
+            print(user_ids,users[user_ids])
+            new_text = new_text.replace(user_ids, users[user_ids])
+    
+    return new_text
+            
+def find_urls_from_text(text): 
+
+    url = ''
+
+    urls = re.findall(r'\<(.+?)\>', text)
+
+    if len(urls) != 0:
+        for item in urls:
+            if(item.find('http')):
+                url += item + ' '
+
+    return url
+
 # 1メッセージのjson辞書データをカンマ区切りの1行データに変換
 def get_line_text(users, item):
 
     text = f'{item[TEXT_KEY]}'.replace('"', '\"')
+
+    text = replace_user_in_text(users, text)
+    
     name = ''
     
     if USER_KEY in item.keys():
@@ -56,14 +87,19 @@ def get_line_text(users, item):
         if user_id in users.keys():
             name = users[user_id]
 
-    urls = ''
+    file_urls = ''
 
     if FILES_KEY in item.keys():
         for attachmentFile in item[FILES_KEY]:
-            url = f"{attachmentFile[URL_KEY]}".replace('"', '\"')
-            urls += f'{url}\n'
+            if URL_KEY in attachmentFile.keys():
+                file_url = f"{attachmentFile[URL_KEY]}".replace('"', '\"')
+                file_urls += f'{file_url}\n'
+            else:
+                file_urls = "This file was deleted."
+    
+    url = find_urls_from_text(text)
 
-    return f'{date},{name},"{text}","{urls}"\n'
+    return f'{date},"{name}","{text}","{file_urls}","{url}"\n'
 
 # 失敗手続き
 def failed(text):
@@ -107,7 +143,7 @@ for channel in channels:
     print(f'[{channel}]')
 
     json_files = sorted(glob.glob(f"{source_dir}/{channel}/*.json"))
-    lines = "date,name,text,files\n"
+    lines = "date,name,text,files,url\n"
 
     # 日付名のjsonファイル単位でループ
     for file_full_path in json_files: 
