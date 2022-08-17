@@ -15,6 +15,8 @@ REAL_NAME_KEY = 'real_name'
 DISPLAY_NAME_KEY = 'display_name'
 FILES_KEY = 'files'
 URL_KEY = 'url_private'
+ATTACHMENT_KEY = 'attachments'
+LINK_KEY = 'title_link'
 
 OUT_PUT_DIR_NAME = 'slack_csv_output'
 USER_FILE_NAME = 'users.json'
@@ -46,6 +48,7 @@ def get_users(source_dir):
 
     return users
 
+# fork: 本文中のユーザー名をreal nameに置き換える
 def replace_user_in_text(users, text):
     regexp = r'\<@(.+?)\>'
     user_id = re.findall(regexp,text)
@@ -60,18 +63,6 @@ def replace_user_in_text(users, text):
     
     return new_text
             
-def find_urls_from_text(text): 
-
-    url = ''
-
-    urls = re.findall(r'\<(.+?)\>', text)
-
-    if len(urls) != 0:
-        for item in urls:
-            if(item.find('http')):
-                url += item + ' '
-
-    return url
 
 # 1メッセージのjson辞書データをカンマ区切りの1行データに変換
 def get_line_text(users, item):
@@ -94,12 +85,21 @@ def get_line_text(users, item):
             if URL_KEY in attachmentFile.keys():
                 file_url = f"{attachmentFile[URL_KEY]}".replace('"', '\"')
                 file_urls += f'{file_url}\n'
-            else:
+            else:  # forl: fileが削除されているとerrorになるのでfallback
                 file_urls = "This file was deleted."
-    
-    url = find_urls_from_text(text)
 
-    return f'{date},"{name}","{text}","{file_urls}","{url}"\n'
+    
+    # fork: urlを別カラムにして保存
+    urls = ''
+
+    if ATTACHMENT_KEY  in item.keys():
+        for attachemnts in item[ATTACHMENT_KEY]: 
+            if LINK_KEY in attachemnts.keys():
+                url = f"{attachemnts[LINK_KEY]}".replace('"', '\"') 
+                urls += f'{url}\n'    
+
+     # forl: user名も囲む（名前に,が入るユーザーでカラムがずれる）
+    return f'{date},"{name}","{text}","{file_urls}","{urls}"\n'
 
 # 失敗手続き
 def failed(text):
